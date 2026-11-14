@@ -7,7 +7,8 @@ const LANGS = {
   python: [".py"], java: [".java"], go: [".go"], cpp: [".cpp", ".cc"], c: [".c"],
   javascript: [".js"], typescript: [".ts"], rust: [".rs"], kotlin: [".kt"], swift: [".swift"], csharp: [".cs"],
 };
-const STATUS = new Set(["已通过", "曾通过", "未开始"]);
+const STATUS = ["已通过", "曾通过", "尝试过", "未开始"];
+const RESULTS = ["通过", "答案错误", "超时", "运行出错", "思路不成立"];
 const errors = [], warnings = [];
 
 const catalog = JSON.parse(fs.readFileSync("hot100.json", "utf8"));
@@ -27,7 +28,7 @@ if (progress) {
     for (const [k, v] of Object.entries(progress.problems)) {
       if (!/^\d+$/.test(k)) errors.push(`progress.json：题号 "${k}" 不是数字`);
       else if (!hot.has(Number(k))) warnings.push(`progress.json：${k} 不在热题 100 里，网站不会显示`);
-      if (!v || !STATUS.has(v.status)) errors.push(`progress.json：第 ${k} 题的 status 必须是 已通过 / 曾通过 / 未开始`);
+      if (!v || !STATUS.includes(v.status)) errors.push(`progress.json：第 ${k} 题的 status 必须是 ${STATUS.join(" / ")}`);
       if (v && v.updatedAt != null && !/^\d{4}-\d{2}-\d{2}$/.test(v.updatedAt)) errors.push(`progress.json：第 ${k} 题的 updatedAt 要写成 YYYY-MM-DD`);
     }
   }
@@ -50,6 +51,56 @@ for (const file of walk("solutions")) {
   const id = Number(m[1]);
   if (!hot.has(id)) warnings.push(`${rel}：${id} 不在热题 100 里，网站不会显示`);
   else if (!m[2].startsWith(hot.get(id).name)) warnings.push(`${rel}：题名建议和 hot100.json 一致（"${hot.get(id).name}"）`);
+}
+
+// 3) attempts/<四位题号>.<题名>/<YYYY-MM-DD>.<序号>.<结果>.md
+//    解析规则和网站 site/functions/_lib/progress.ts 的 parseAttemptPath / parseAttemptBody 一致
+function parseAttemptPath(p) {
+  const m = p.match(/^attempts\/(\d{4})\.([^/]+)\/(\d{4}-\d{2}-\d{2})\.(\d+)\.([^./]+)\.md$/);
+  if (!m || !RESULTS.includes(m[5])) return null;
+  return { id: Number(m[1]), name: m[2], date: m[3], seq: Number(m[4]), result: m[5] };
+}
+function parseAttemptBody(src) {
+  const errs = [];
+  const text = src.replace(/^﻿/, "").replace(/\r\n/g, "\n");
+  const fm = text.match(/^---\n([\s\S]*?)\n---\n/);
+  const meta = {};
+  if (!fm) errs.push("开头要有 --- 包起来的设置（至少写 lang）");
+  else for (const line of fm[1].split("\n")) {
+    if (!line.trim() || line.trim().startsWith("#")) continue;
+    const kv = line.match(/^([A-Za-z]+):\s*(.*?)\s*(?:#.*)?$/);
+    if (!kv) { errs.push(`设置里看不懂这一行：${line}`); continue; }
+    meta[kv[1]] = kv[2];
+  }
+  const lang = meta.lang ?? "";
+  if (fm && !LANGS[lang]) errs.push(`lang 要写成语言目录名之一：${Object.keys(LANGS).join(" / ")}`);
+  if (meta.verbatim != null && meta.verbatim !== "true" && meta.verbatim !== "false") errs.push("verbatim 只能写 true 或 false");
+  const body = fm ? text.slice(fm[0].length) : text;
+  let code = null;
+  for (const chunk of body.split(/^## +/m).slice(1)) {
+    const nl = chunk.indexOf("\n");
+    const title = (nl < 0 ? chunk : chunk.slice(0, nl)).trim();
+    const content = (nl < 0 ? "" : chunk.slice(nl + 1)).trim();
+    if (title !== "代码") continue;
+    const c = content.match(/^(`{3,})([^\n`]*)\n([\s\S]*?)\n\1\s*$/);
+    if (!c) errs.push("「代码」一节里要放且只放一个 ``` 代码块");
+    else code = c[3];
+  }
+  return { lang, code, errors: errs };
+}
+for (const file of walk("attempts")) {
+  const rel = file.split(path.sep).join("/");
+  const base = path.basename(rel);
+  if (base === ".gitkeep" || base === "README.md") continue;
+  const a = parseAttemptPath(rel);
+  if (!a) {
+    errors.push(`${rel}：尝试记录要写成 attempts/<四位题号>.<题名>/<YYYY-MM-DD>.<序号>.<结果>.md，结果只能是 ${RESULTS.join(" / ")}`);
+    continue;
+  }
+  if (Number.isNaN(Date.parse(a.date))) errors.push(`${rel}：日期 ${a.date} 不是有效的日期`);
+  if (!hot.has(a.id)) warnings.push(`${rel}：${a.id} 不在热题 100 里，网站不会显示`);
+  else if (a.name !== hot.get(a.id).name) warnings.push(`${rel}：目录名里的题名建议和 hot100.json 一致（"${hot.get(a.id).name}"）`);
+  for (const e of parseAttemptBody(fs.readFileSync(file, "utf8")).errors) errors.push(`${rel}：${e}`);
 }
 
 for (const w of warnings) console.log("提示：" + w);
