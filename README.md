@@ -6,8 +6,10 @@
 
 ## 怎么开始
 
-- **推荐**：打开网站，用 GitHub 登录，按提示一键创建。网站会用这个模板在你的账号下生成一个 `hot100-progress` 仓库。
-- **手动**：点右上角的 **Use this template → Create a new repository**，仓库名填 `hot100-progress`（名字要一致，网站按这个名字找）。
+1. 点右上角的 **Use this template → Create a new repository**，仓库名填 `hot100-progress`（名字要一致，网站按这个名字找），选 **Public**。
+2. 打开网站，用 GitHub 登录，按提示把网站的 GitHub App 装到这个仓库上。安装时选 **Only select repositories**，只勾 `hot100-progress`——网站只拿到这一个仓库的读写权限，碰不到你的其他仓库。
+
+网站首页登录后会一步一步提示这两件事。
 
 ## 文件规则
 
