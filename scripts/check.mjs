@@ -75,6 +75,9 @@ function parseAttemptBody(src) {
   const lang = meta.lang ?? "";
   if (fm && !LANGS[lang]) errs.push(`lang 要写成语言目录名之一：${Object.keys(LANGS).join(" / ")}`);
   if (meta.verbatim != null && meta.verbatim !== "true" && meta.verbatim !== "false") errs.push("verbatim 只能写 true 或 false");
+  // 从力扣同步过来的记录（或补过编号的手写记录）带着 source / submission / submittedAt
+  if (meta.submission != null && !/^\d+$/.test(meta.submission)) errs.push("submission 只能写力扣的提交编号（数字）");
+  if (meta.submittedAt != null && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?([+-]\d{2}:\d{2}|Z)$/.test(meta.submittedAt)) errs.push("submittedAt 要写成 2026-11-14T10:05:00+08:00 这样");
   const body = fm ? text.slice(fm[0].length) : text;
   let code = null;
   for (const chunk of body.split(/^## +/m).slice(1)) {
@@ -86,12 +89,21 @@ function parseAttemptBody(src) {
     if (!c) errs.push("「代码」一节里要放且只放一个 ``` 代码块");
     else code = c[3];
   }
-  return { lang, code, errors: errs };
+  return { lang, code, submission: meta.submission ?? null, errors: errs };
 }
+const seenSubmission = new Map();
 for (const file of walk("attempts")) {
   const rel = file.split(path.sep).join("/");
   const base = path.basename(rel);
   if (base === ".gitkeep" || base === "README.md") continue;
+  // attempts/skip.txt：不要从力扣导入的提交编号，一行一个，# 后面是注释
+  if (rel === "attempts/skip.txt") {
+    fs.readFileSync(file, "utf8").split(/\r?\n/).forEach((line, i) => {
+      const l = line.replace(/#.*/, "").trim();
+      if (l && !/^\d+$/.test(l)) errors.push(`attempts/skip.txt 第 ${i + 1} 行：只能写力扣的提交编号（数字），注释用 # 开头`);
+    });
+    continue;
+  }
   const a = parseAttemptPath(rel);
   if (!a) {
     errors.push(`${rel}：尝试记录要写成 attempts/<四位题号>.<题名>/<YYYY-MM-DD>.<序号>.<结果>.md，结果只能是 ${RESULTS.join(" / ")}`);
@@ -100,7 +112,12 @@ for (const file of walk("attempts")) {
   if (Number.isNaN(Date.parse(a.date))) errors.push(`${rel}：日期 ${a.date} 不是有效的日期`);
   if (!hot.has(a.id)) warnings.push(`${rel}：${a.id} 不在热题 100 里，网站不会显示`);
   else if (a.name !== hot.get(a.id).name) warnings.push(`${rel}：目录名里的题名建议和 hot100.json 一致（"${hot.get(a.id).name}"）`);
-  for (const e of parseAttemptBody(fs.readFileSync(file, "utf8")).errors) errors.push(`${rel}：${e}`);
+  const body = parseAttemptBody(fs.readFileSync(file, "utf8"));
+  for (const e of body.errors) errors.push(`${rel}：${e}`);
+  if (body.submission) {
+    if (seenSubmission.has(body.submission)) errors.push(`${rel}：力扣提交 ${body.submission} 已经记在 ${seenSubmission.get(body.submission)} 里了，同一次提交只记一份`);
+    else seenSubmission.set(body.submission, rel);
+  }
 }
 
 for (const w of warnings) console.log("提示：" + w);
