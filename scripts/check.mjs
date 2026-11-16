@@ -34,6 +34,24 @@ if (progress) {
   }
 }
 
+// 1b) settings.json（可以没有）：{ version: 1, langs: [语言目录名…] }，第一个是默认语言
+if (fs.existsSync("settings.json")) {
+  let settings;
+  try {
+    settings = JSON.parse(fs.readFileSync("settings.json", "utf8").replace(/^﻿/, ""));
+  } catch (e) {
+    errors.push(`settings.json 不是合法的 JSON：${e.message}`);
+  }
+  if (settings) {
+    if (settings.version !== 1) errors.push("settings.json 的 version 必须是 1");
+    if (!Array.isArray(settings.langs) || !settings.langs.length) errors.push("settings.json 的 langs 要是一个数组，至少写一种语言");
+    else {
+      for (const l of settings.langs) if (!LANGS[l]) errors.push(`settings.json：不认识的语言 "${l}"，可选 ${Object.keys(LANGS).join(" / ")}`);
+      if (new Set(settings.langs).size !== settings.langs.length) errors.push("settings.json 的 langs 里有重复的语言");
+    }
+  }
+}
+
 // 2) solutions/<语言>/<四位题号>.<题名>[.<写法>].<后缀>
 const walk = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(dir, e.name)) : [path.join(dir, e.name)])) : []);
 for (const file of walk("solutions")) {
