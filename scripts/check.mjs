@@ -96,6 +96,9 @@ function parseAttemptBody(src) {
   // 从力扣同步过来的记录（或补过编号的手写记录）带着 source / submission / submittedAt
   if (meta.submission != null && !/^\d+$/.test(meta.submission)) errs.push("submission 只能写力扣的提交编号（数字）");
   if (meta.submittedAt != null && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?([+-]\d{2}:\d{2}|Z)$/.test(meta.submittedAt)) errs.push("submittedAt 要写成 2026-11-14T10:05:00+08:00 这样");
+  // 网站练习区记的带着 source: practice、mode、ranAt
+  if (meta.mode != null && meta.mode !== "leetcode" && meta.mode !== "acm") errs.push("mode 只能写 leetcode 或 acm");
+  if (meta.ranAt != null && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?([+-]\d{2}:\d{2}|Z)$/.test(meta.ranAt)) errs.push("ranAt 要写成 2026-11-17T23:30:00+08:00 这样");
   const body = fm ? text.slice(fm[0].length) : text;
   let code = null;
   for (const chunk of body.split(/^## +/m).slice(1)) {
@@ -136,6 +139,21 @@ for (const file of walk("attempts")) {
     if (seenSubmission.has(body.submission)) errors.push(`${rel}：力扣提交 ${body.submission} 已经记在 ${seenSubmission.get(body.submission)} 里了，同一次提交只记一份`);
     else seenSubmission.set(body.submission, rel);
   }
+}
+
+// 4) drafts/<语言>/<四位题号>.<题名>[.ACM].<后缀>：网站练习区的草稿（Ctrl+S、自动保存）
+for (const file of walk("drafts")) {
+  const rel = file.split(path.sep).join("/");
+  const base = path.basename(rel);
+  if (base === ".gitkeep" || base === "README.md") continue;
+  const parts = rel.split("/");
+  if (parts.length !== 3) { errors.push(`${rel}：草稿要直接放在 drafts/<语言>/ 下面`); continue; }
+  const [, lang, name] = parts;
+  if (!LANGS[lang]) { errors.push(`${rel}：不认识的语言目录 "${lang}"，可选 ${Object.keys(LANGS).join(" / ")}`); continue; }
+  if (!LANGS[lang].includes(path.extname(name))) errors.push(`${rel}：${lang} 目录下的文件后缀应该是 ${LANGS[lang].join(" 或 ")}`);
+  const m = name.match(/^(\d{4})\.([^.]+)(\.ACM)?\.[A-Za-z0-9]+$/);
+  if (!m) { errors.push(`${rel}：草稿的文件名要写成 <四位题号>.<题名>[.ACM].<后缀>`); continue; }
+  if (!hot.has(Number(m[1]))) warnings.push(`${rel}：${Number(m[1])} 不在热题 100 里，网站不会显示`);
 }
 
 for (const w of warnings) console.log("提示：" + w);
