@@ -56,6 +56,10 @@
 | `kotlin` | `.kt` |
 | `swift` | `.swift` |
 | `csharp` | `.cs` |
+| `ruby` | `.rb` |
+| `php` | `.php` |
+| `scala` | `.scala` |
+| `dart` | `.dart` |
 
 - 题号补齐到四位，题名照抄 `hot100.json` 里的 `name`，例如 `solutions/python/0001.两数之和.py`、`solutions/java/0146.LRU 缓存.java`。
 - 同一道题的多种写法，在题名后面加一段写法名：`solutions/python/0200.岛屿数量.BFS.py`。

@@ -6,6 +6,7 @@ import path from "node:path";
 const LANGS = {
   python: [".py"], java: [".java"], go: [".go"], cpp: [".cpp", ".cc"], c: [".c"],
   javascript: [".js"], typescript: [".ts"], rust: [".rs"], kotlin: [".kt"], swift: [".swift"], csharp: [".cs"],
+  ruby: [".rb"], php: [".php"], scala: [".scala"], dart: [".dart"],
 };
 const STATUS = ["已通过", "曾通过", "尝试过", "未开始"];
 const RESULTS = ["通过", "答案错误", "超时", "运行出错", "思路不成立"];
